@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Televisor</string>
+    <string name="pairing_title">Vincular pantalla</string>
+    <string name="pairing_instructions">Ingrese este código en el panel municipal:\nPantallas → Vincular</string>
+    <string name="pairing_waiting">Esperando vinculación…</string>
+    <string name="pairing_pending">Pantalla registrada. Complete el nombre en el panel.</string>
+    <string name="pairing_error">No se pudo conectar con el servidor.</string>
+    <string name="pairing_already_activated">Esta pantalla ya fue vinculada. Revóquela en el panel y vincule de nuevo, o restablezca la app.</string>
+    <string name="pairing_inactive">Pantalla inactiva o revocada.</string>
+    <string name="btn_retry">Reintentar</string>
+    <string name="btn_settings">Servidor API</string>
+    <string name="btn_reset">Restablecer vinculación</string>
+    <string name="linked_title">Pantalla vinculada</string>
+    <string name="linked_back_player">Volver al reproductor</string>
+    <string name="linked_refresh">Sincronizar ahora</string>
+    <string name="sync_in_progress">Sincronizando contenido…</string>
+    <string name="sync_hint">Diagnóstico y sincronización manual.</string>
+    <string name="player_empty">Sin contenido local. Sincronizando…</string>
+    <string name="player_image_content_desc">Imagen de cartelería</string>
+    <string name="player_menu_hint">Menú: diagnóstico · Atrás: salir</string>
+    <string name="urgent_banner_label">Mensaje urgente municipal</string>
+    <string name="urgent_valid_until">Vigente hasta</string>
+    <string name="urgent_priority">Prioridad %1$d</string>
+    <string name="settings_title">URL del servidor</string>
+    <string name="settings_hint">Ej. http://192.168.1.10:8000/api/v1/</string>
+    <string name="settings_save">Guardar</string>
+</resources>

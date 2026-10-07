@@ -1,0 +1,3 @@
+-keepattributes Signature
+-keepclassmembers class cl.televisor.app.data.api.** { *; }
+-keep class androidx.media3.** { *; }

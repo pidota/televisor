@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="televisor_primary">#0D3B66</color>
+    <color name="televisor_accent">#C1121F</color>
+    <color name="televisor_background">#0B1F33</color>
+    <color name="televisor_surface">#132F4C</color>
+    <color name="televisor_on_primary">#FFFFFF</color>
+    <color name="televisor_muted">#B8C5D6</color>
+</resources>

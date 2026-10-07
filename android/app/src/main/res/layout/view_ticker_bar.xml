@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tickerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="96dp"
+    android:layout_gravity="bottom"
+    android:background="#E6000000"
+    android:visibility="gone">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:background="@color/televisor_accent" />
+
+    <FrameLayout
+        android:id="@+id/tickerScrollHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="4dp"
+        android:clipChildren="true"
+        android:clipToPadding="true">
+
+        <TextView
+            android:id="@+id/tickerLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:ellipsize="none"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp"
+            android:singleLine="true"
+            android:textColor="@color/televisor_on_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+</FrameLayout>

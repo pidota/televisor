@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Televisor" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/televisor_primary</item>
+        <item name="colorPrimaryVariant">@color/televisor_surface</item>
+        <item name="colorAccent">@color/televisor_accent</item>
+        <item name="android:windowBackground">@color/televisor_background</item>
+        <item name="android:statusBarColor">@color/televisor_background</item>
+    </style>
+</resources>
