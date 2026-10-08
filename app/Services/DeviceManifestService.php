@@ -32,6 +32,22 @@ class DeviceManifestService
 
         $content = $this->contentResolver->describe($screen);
 
+        if ($content['source'] === 'live') {
+            $overlay = $content['urgent_message'] instanceof \App\Models\UrgentMessage
+                ? $this->mapUrgentMessage($content['urgent_message'])
+                : null;
+
+            return $this->manifestCache[$cacheKey] = [
+                'version' => $screen->manifest_version,
+                'generated_at' => now()->toIso8601String(),
+                'source' => 'live',
+                'live' => ['url' => $content['live_url']],
+                'urgent_message' => $overlay,
+                'playlist' => null,
+                'items' => [],
+            ];
+        }
+
         if ($content['source'] === 'urgent' && $content['urgent_message'] instanceof \App\Models\UrgentMessage) {
             $urgent = $content['urgent_message'];
 

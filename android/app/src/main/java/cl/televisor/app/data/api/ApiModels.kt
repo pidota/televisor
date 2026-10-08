@@ -71,8 +71,14 @@ data class ManifestResponseData(
     @Json(name = "generated_at") val generatedAt: String,
     val source: String,
     @Json(name = "urgent_message") val urgentMessage: UrgentMessageData? = null,
+    val live: LiveStreamData? = null,
     val playlist: ManifestPlaylist? = null,
     val items: List<ManifestMediaItem> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class LiveStreamData(
+    val url: String,
 )
 
 @JsonClass(generateAdapter = true)

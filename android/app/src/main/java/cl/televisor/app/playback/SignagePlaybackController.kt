@@ -42,7 +42,7 @@ class SignagePlaybackController(
     private var syncJob: Job? = null
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED && playlistItems.isNotEmpty()) {
+            if (playbackState == Player.STATE_ENDED && snapshot?.source != "live" && playlistItems.isNotEmpty()) {
                 playNext()
             }
         }
@@ -91,11 +91,13 @@ class SignagePlaybackController(
                 delay(pollSeconds * 1000L)
                 val before = snapshot?.version to snapshot?.source
                 val urgentBefore = snapshot?.urgentMessage?.id
+                val liveBefore = snapshot?.liveUrl
                 repository.syncContent(force = false)
                 val afterManifest = repository.localManifest()
                 val after = afterManifest?.version to afterManifest?.source
                 val urgentAfter = afterManifest?.urgentMessage?.id
-                if (before != after || urgentBefore != urgentAfter) {
+                val liveAfter = afterManifest?.liveUrl
+                if (before != after || urgentBefore != urgentAfter || liveBefore != liveAfter) {
                     applyManifest(afterManifest)
                 } else if (isFullscreenUrgent(afterManifest)) {
                     afterManifest?.let { refreshUrgentContent(it) }
@@ -107,6 +109,11 @@ class SignagePlaybackController(
     }
 
     private fun applyManifest(manifest: LocalManifestSnapshot?) {
+        if (manifest != null && isLive(manifest)) {
+            applyLive(manifest)
+            return
+        }
+
         if (manifest != null && canContinuePlayback(manifest)) {
             snapshot = manifest
             updateTickerOverlay(manifest)
@@ -145,6 +152,35 @@ class SignagePlaybackController(
         showEmpty(false)
         currentIndex = 0
         playItemAt(currentIndex)
+    }
+
+    private fun isLive(manifest: LocalManifestSnapshot): Boolean {
+        return manifest.source == "live" && !manifest.liveUrl.isNullOrBlank()
+    }
+
+    private fun applyLive(manifest: LocalManifestSnapshot) {
+        val url = manifest.liveUrl ?: return
+        val continuing = snapshot?.source == "live"
+            && snapshot?.liveUrl == url
+            && player.playbackState != Player.STATE_IDLE
+            && player.playbackState != Player.STATE_ENDED
+
+        snapshot = manifest
+        playlistItems = emptyList()
+        cancelImageTimer()
+        urgentView.hide()
+        updateTickerOverlay(manifest)
+        showEmpty(false)
+        imageView.visibility = View.GONE
+        playerView.visibility = View.VISIBLE
+
+        if (continuing) {
+            return
+        }
+
+        player.setMediaItem(MediaItem.fromUri(url))
+        player.prepare()
+        player.playWhenReady = true
     }
 
     private fun canContinuePlayback(manifest: LocalManifestSnapshot): Boolean {

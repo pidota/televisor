@@ -15,6 +15,7 @@ data class LocalManifestSnapshot(
     val playlistName: String? = null,
     val playlistRevision: Int? = null,
     val urgentMessage: UrgentMessageData? = null,
+    val liveUrl: String? = null,
     val items: List<LocalMediaEntry> = emptyList(),
     val syncedAtEpochMs: Long = System.currentTimeMillis(),
 )
@@ -64,6 +65,7 @@ fun ManifestResponseData.toLocalSnapshot(items: List<LocalMediaEntry>): LocalMan
         playlistName = playlist?.name,
         playlistRevision = playlist?.revision,
         urgentMessage = urgentMessage,
+        liveUrl = live?.url,
         items = items,
         syncedAtEpochMs = System.currentTimeMillis(),
     )

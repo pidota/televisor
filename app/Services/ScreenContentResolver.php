@@ -17,6 +17,7 @@ class ScreenContentResolver
         private readonly SettingStore $settings,
         private readonly PlaylistAssignmentService $assignments,
         private readonly UrgentMessageService $urgentMessages,
+        private readonly LiveBroadcastService $liveBroadcast,
     ) {}
 
     public function resolvePlaylist(Screen $screen, ?CarbonInterface $at = null): ?Playlist
@@ -110,6 +111,16 @@ class ScreenContentResolver
                 'playlist' => null,
                 'schedule' => null,
                 'urgent_message' => $urgent,
+            ];
+        }
+
+        if ($this->liveBroadcast->appliesTo($screen)) {
+            return [
+                'source' => 'live',
+                'playlist' => null,
+                'schedule' => null,
+                'urgent_message' => $this->tickerOverlayMessage($urgent),
+                'live_url' => $this->liveBroadcast->hlsUrl(),
             ];
         }
 

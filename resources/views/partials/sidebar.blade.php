@@ -50,6 +50,13 @@
             <i class="bi bi-exclamation-triangle"></i> Mensajes urgentes
         </a>
 
+        @can('manage-content')
+            <a href="{{ route('live.index') }}"
+               class="nav-link {{ request()->routeIs('live.*') ? 'active' : '' }}">
+                <i class="bi bi-broadcast"></i> Transmisión en vivo
+            </a>
+        @endcan
+
         @if ($isAdmin)
             <div class="panel-nav-section">Administración</div>
             <a href="{{ route('users.index') }}"

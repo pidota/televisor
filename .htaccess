@@ -1,5 +1,7 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    # Listas y segmentos HLS de MediaMTX. La ruta pública coincide con la que anuncia el servidor.
+    RewriteRule ^(.+\.(?:m3u8|ts|m4s))$ http://127.0.0.1:8888/televisor/$1 [P,L,QSA]
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
 

@@ -31,6 +31,7 @@ android {
         }
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -70,5 +71,6 @@ dependencies {
     implementation("androidx.leanback:leanback:1.0.0")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
 }

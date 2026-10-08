@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\LiveBroadcastController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MediaAssetController;
 use App\Http\Controllers\PlaylistAssignmentController;
@@ -115,6 +116,11 @@ Route::middleware('auth')->group(function () {
     Route::get('programacion/{schedule}', [ScheduleController::class, 'show'])->name('schedules.show');
 
     Route::get('mensajes-urgentes', [UrgentMessageController::class, 'index'])->name('urgent-messages.index');
+
+    Route::middleware('can:manage-content')->group(function () {
+        Route::get('transmision', [LiveBroadcastController::class, 'index'])->name('live.index');
+        Route::put('transmision', [LiveBroadcastController::class, 'update'])->name('live.update');
+    });
 
     Route::middleware('can:manage-content')->group(function () {
         Route::get('mensajes-urgentes/nuevo', [UrgentMessageController::class, 'create'])->name('urgent-messages.create');

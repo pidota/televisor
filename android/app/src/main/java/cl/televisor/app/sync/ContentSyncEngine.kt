@@ -47,7 +47,7 @@ class ContentSyncEngine(
             val allReady = remote.items.all { item ->
                 mediaStore.findVerified(item.uuid, item.checksum) != null
             }
-            if (allReady && remote.source != "urgent") {
+            if (allReady && remote.source != "urgent" && remote.source != "live") {
                 sendHeartbeat(remote.version)
                 return@withContext SyncResult.Skipped("Manifiesto v${remote.version} ya sincronizado")
             }
@@ -55,6 +55,7 @@ class ContentSyncEngine(
 
         val syncOutcome = when {
             remote.source == "urgent" -> syncUrgent(remote)
+            remote.source == "live" -> syncLive(remote)
             else -> syncPlaylist(remote)
         }
 
@@ -68,6 +69,19 @@ class ContentSyncEngine(
         manifestStore.clear()
         mediaStore.clearAll()
         session.clearSyncMetadata()
+    }
+
+    private fun syncLive(remote: ManifestResponseData): SyncResult {
+        val snapshot = remote.toLocalSnapshot(emptyList())
+        manifestStore.save(snapshot)
+        session.setLastSyncedManifestVersion(remote.version)
+        return SyncResult.Success(
+            snapshot = snapshot,
+            downloaded = 0,
+            skipped = 0,
+            failed = 0,
+            pruned = 0,
+        )
     }
 
     private fun syncUrgent(remote: ManifestResponseData): SyncResult {
