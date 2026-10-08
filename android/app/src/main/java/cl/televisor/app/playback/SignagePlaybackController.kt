@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.core.net.toUri
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -39,11 +40,24 @@ class SignagePlaybackController(
     private var snapshot: LocalManifestSnapshot? = null
     private var imageAdvanceRunnable: Runnable? = null
     private var monitorJob: Job? = null
+    private var heartbeatJob: Job? = null
     private var syncJob: Job? = null
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED && snapshot?.source != "live" && playlistItems.isNotEmpty()) {
                 playNext()
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            when (snapshot?.source) {
+                "live" -> scope.launch {
+                    repository.syncContent(force = true)
+                    applyManifest(repository.localManifest())
+                }
+                else -> if (playlistItems.isNotEmpty()) {
+                    playNext()
+                }
             }
         }
     }
@@ -55,10 +69,12 @@ class SignagePlaybackController(
             applyManifest(repository.localManifest())
         }
         startManifestMonitor()
+        startHeartbeatLoop()
     }
 
     fun stop() {
         monitorJob?.cancel()
+        heartbeatJob?.cancel()
         syncJob?.cancel()
         cancelImageTimer()
         urgentView.hide(animate = false)
@@ -75,6 +91,17 @@ class SignagePlaybackController(
             val urgentChanged = local?.urgentMessage != snapshot?.urgentMessage
             if (versionChanged || sourceChanged || urgentChanged) {
                 applyManifest(local)
+            }
+        }
+    }
+
+    private fun startHeartbeatLoop() {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch {
+            while (isActive) {
+                val seconds = repository.heartbeatIntervalSeconds().coerceIn(30, 300)
+                delay(seconds * 1000L)
+                repository.sendHeartbeatOnly()
             }
         }
     }
@@ -299,6 +326,7 @@ class SignagePlaybackController(
         playerView.visibility = View.GONE
         imageView.visibility = View.VISIBLE
 
+        imageView.setImageDrawable(null)
         val bitmap = BitmapFactory.decodeFile(item.file.absolutePath)
         imageView.setImageBitmap(bitmap)
 

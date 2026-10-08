@@ -32,6 +32,7 @@ class PlayerActivity : AppCompatActivity() {
         enterImmersive()
 
         val app = application as TelevisorApplication
+        // Respaldo si el sistema pausa la actividad; la sync principal la hace SignagePlaybackController.
         app.deviceRepository.startBackgroundSync()
 
         val player = ExoPlayer.Builder(this).build()

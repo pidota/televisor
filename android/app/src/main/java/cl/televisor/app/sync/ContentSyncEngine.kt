@@ -12,6 +12,8 @@ import cl.televisor.app.data.local.LocalMediaEntry
 import cl.televisor.app.data.local.MediaFileStore
 import cl.televisor.app.data.local.toLocalSnapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class ContentSyncEngine(
@@ -21,14 +23,38 @@ class ContentSyncEngine(
     private val mediaStore: MediaFileStore,
 ) {
 
+    private val syncMutex = Mutex()
+
     suspend fun sync(force: Boolean = false): SyncResult = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            syncUnlocked(force)
+        }
+    }
+
+    /** Heartbeat ligero para mantener la pantalla online aunque haya una descarga larga en curso. */
+    suspend fun sendHeartbeatOnly(): Boolean = withContext(Dispatchers.IO) {
         if (!session.hasDeviceToken()) {
-            return@withContext SyncResult.Failure("Sin token de dispositivo")
+            return@withContext false
+        }
+
+        val version = manifestStore.load()?.version
+            ?: session.getLastSyncedManifestVersion().takeIf { it >= 0 }
+            ?: 0
+
+        runCatching {
+            sendHeartbeat(version)
+            true
+        }.getOrDefault(false)
+    }
+
+    private suspend fun syncUnlocked(force: Boolean): SyncResult {
+        if (!session.hasDeviceToken()) {
+            return SyncResult.Failure("Sin token de dispositivo")
         }
 
         val configResult = runCatching { apiClient.api().config().data }
         val config = configResult.getOrElse {
-            return@withContext SyncResult.Failure(it.message ?: "Error de config")
+            return SyncResult.Failure(it.message ?: "Error de config")
         }
 
         session.saveSyncIntervals(
@@ -39,8 +65,10 @@ class ContentSyncEngine(
 
         val remoteResult = runCatching { apiClient.api().playlist().data }
         val remote = remoteResult.getOrElse {
-            return@withContext SyncResult.Failure(it.message ?: "Error de manifiesto")
+            return SyncResult.Failure(it.message ?: "Error de manifiesto")
         }
+
+        sendHeartbeat(remote.version)
 
         val cached = manifestStore.load()
         if (!force && cached != null && cached.version == remote.version && cached.source == remote.source) {
@@ -48,8 +76,7 @@ class ContentSyncEngine(
                 mediaStore.findVerified(item.uuid, item.checksum) != null
             }
             if (allReady && remote.source != "urgent" && remote.source != "live") {
-                sendHeartbeat(remote.version)
-                return@withContext SyncResult.Skipped("Manifiesto v${remote.version} ya sincronizado")
+                return SyncResult.Skipped("Manifiesto v${remote.version} ya sincronizado")
             }
         }
 
@@ -60,7 +87,7 @@ class ContentSyncEngine(
         }
 
         sendHeartbeat(remote.version)
-        syncOutcome
+        return syncOutcome
     }
 
     fun loadLocalManifest() = manifestStore.load()

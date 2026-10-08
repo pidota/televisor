@@ -75,6 +75,10 @@ class DeviceRepository(
 
     fun manifestPollSeconds(): Int = session.getManifestPollSeconds()
 
+    fun heartbeatIntervalSeconds(): Int = session.getHeartbeatIntervalSeconds()
+
+    suspend fun sendHeartbeatOnly(): Boolean = syncEngine.sendHeartbeatOnly()
+
     fun appTimezone(): String? = session.getAppTimezone()
 
     suspend fun reportUrgentPlayback(urgentMessageId: Int) {
