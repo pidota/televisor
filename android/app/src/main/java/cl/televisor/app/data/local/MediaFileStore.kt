@@ -28,10 +28,19 @@ class MediaFileStore(context: Context) {
         if (!file.exists() || file.length() == 0L) {
             return null
         }
+
+        val sidecar = checksumSidecar(file)
+        val cached = sidecar.takeIf { it.exists() }?.readText()?.trim()
+        if (cached != null && cached.equals(expectedChecksum, ignoreCase = true)) {
+            return file
+        }
+
         val hash = sha256Hex(file)
         return if (hash.equals(expectedChecksum, ignoreCase = true)) {
+            runCatching { sidecar.writeText(hash) }
             file
         } else {
+            sidecar.delete()
             null
         }
     }
@@ -72,7 +81,17 @@ class MediaFileStore(context: Context) {
             temp.copyTo(target, overwrite = true)
             temp.delete()
         }
+        runCatching { checksumSidecar(target).writeText(item.checksum) }
         target
+    }
+
+    /** Descartas parciales de descargas interrumpidas (pueden ocupar cientos de MB cada una). */
+    fun purgeIncompleteDownloads() {
+        mediaRoot.listFiles()?.forEach { file ->
+            if (file.name.endsWith(".part")) {
+                file.delete()
+            }
+        }
     }
 
     fun relativePathFor(uuid: String, mimeType: String): String {
@@ -83,9 +102,18 @@ class MediaFileStore(context: Context) {
 
     fun pruneExcept(allowedUuids: Set<String>) {
         mediaRoot.listFiles()?.forEach { file ->
-            val uuid = file.nameWithoutExtension.substringBeforeLast('.')
-            if (uuid.isNotEmpty() && uuid !in allowedUuids) {
+            if (file.name.endsWith(".part") || file.name.endsWith(".sha256")) {
+                val mediaUuid = uuidFromFileName(file.name)
+                if (mediaUuid != null && mediaUuid !in allowedUuids) {
+                    file.delete()
+                }
+                return@forEach
+            }
+
+            val uuid = uuidFromFileName(file.name) ?: return@forEach
+            if (uuid !in allowedUuids) {
                 file.delete()
+                checksumSidecar(file).delete()
             }
         }
     }
@@ -113,6 +141,23 @@ class MediaFileStore(context: Context) {
             else -> "bin"
         }
         return "$uuid.$ext"
+    }
+
+    private fun checksumSidecar(mediaFile: File): File {
+        return File(mediaFile.parentFile, "${mediaFile.name}.sha256")
+    }
+
+    private fun uuidFromFileName(name: String): String? {
+        val base = when {
+            name.endsWith(".part") -> name.removeSuffix(".part")
+            name.endsWith(".sha256") -> name.removeSuffix(".sha256")
+            else -> name
+        }
+        val dot = base.lastIndexOf('.')
+        if (dot <= 0) {
+            return null
+        }
+        return base.substring(0, dot)
     }
 
     private fun sha256Hex(file: File): String {

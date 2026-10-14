@@ -14,7 +14,7 @@ use App\Http\Controllers\ScreenController;
 use App\Http\Controllers\ScreenPairingController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/dashboard');
+Route::get('/', fn () => redirect()->route('dashboard'));
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'create'])->name('login');

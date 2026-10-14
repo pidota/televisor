@@ -149,7 +149,7 @@ class TickerOverlayView(
     companion object {
         private const val TICKER_SEPARATOR = "   •   "
         private const val TICKER_LOOP_GAP = "          "
-        private const val UNIT_REPEAT_COUNT = 16
+        private const val UNIT_REPEAT_COUNT = 6
         private const val MS_PER_PIXEL = 6f
         private const val MIN_CYCLE_MS = 4_000L
     }

@@ -130,6 +130,8 @@ class ContentSyncEngine(
         var failed = 0
         var pruned = 0
 
+        mediaStore.purgeIncompleteDownloads()
+
         if (remote.items.isNotEmpty()) {
             val allowed = remote.items.map { it.uuid }.toSet()
             val before = mediaStore.mediaRootPath().listFiles()?.size ?: 0

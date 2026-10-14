@@ -21,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
 
+        $middleware->prependToGroup('web', \App\Http\Middleware\FixAppUrlIntendedPath::class);
+
         $middleware->web(append: [
             \App\Http\Middleware\SecurityHeaders::class,
         ]);

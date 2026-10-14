@@ -3,6 +3,7 @@ package cl.televisor.app.playback
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -17,10 +18,14 @@ import cl.televisor.app.data.DeviceRepository
 import cl.televisor.app.data.api.UrgentMessageData
 import cl.televisor.app.data.local.LocalManifestSnapshot
 import cl.televisor.app.data.local.MediaFileStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class SignagePlaybackController(
     private val player: ExoPlayer,
@@ -42,8 +47,19 @@ class SignagePlaybackController(
     private var monitorJob: Job? = null
     private var heartbeatJob: Job? = null
     private var syncJob: Job? = null
+    private var imageLoadJob: Job? = null
+    private var bufferingSinceMs: Long? = null
+    private val manifestApplyMutex = Mutex()
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    if (bufferingSinceMs == null) {
+                        bufferingSinceMs = SystemClock.elapsedRealtime()
+                    }
+                }
+                Player.STATE_READY, Player.STATE_PLAYING -> bufferingSinceMs = null
+            }
             if (playbackState == Player.STATE_ENDED && snapshot?.source != "live" && playlistItems.isNotEmpty()) {
                 playNext()
             }
@@ -53,7 +69,7 @@ class SignagePlaybackController(
             when (snapshot?.source) {
                 "live" -> scope.launch {
                     repository.syncContent(force = true)
-                    applyManifest(repository.localManifest())
+                    applyManifestSafe(repository.localManifest())
                 }
                 else -> if (playlistItems.isNotEmpty()) {
                     playNext()
@@ -66,7 +82,7 @@ class SignagePlaybackController(
         player.addListener(playerListener)
         scope.launch {
             repository.syncContent(force = false)
-            applyManifest(repository.localManifest())
+            applyManifestSafe(repository.localManifest())
         }
         startManifestMonitor()
         startHeartbeatLoop()
@@ -76,6 +92,7 @@ class SignagePlaybackController(
         monitorJob?.cancel()
         heartbeatJob?.cancel()
         syncJob?.cancel()
+        imageLoadJob?.cancel()
         cancelImageTimer()
         urgentView.hide(animate = false)
         tickerView.hide()
@@ -90,7 +107,7 @@ class SignagePlaybackController(
             val sourceChanged = local?.source != snapshot?.source
             val urgentChanged = local?.urgentMessage != snapshot?.urgentMessage
             if (versionChanged || sourceChanged || urgentChanged) {
-                applyManifest(local)
+                applyManifestSafe(local)
             }
         }
     }
@@ -125,12 +142,37 @@ class SignagePlaybackController(
                 val urgentAfter = afterManifest?.urgentMessage?.id
                 val liveAfter = afterManifest?.liveUrl
                 if (before != after || urgentBefore != urgentAfter || liveBefore != liveAfter) {
-                    applyManifest(afterManifest)
+                    applyManifestSafe(afterManifest)
                 } else if (isFullscreenUrgent(afterManifest)) {
                     afterManifest?.let { refreshUrgentContent(it) }
                 } else if (isTickerMessage(afterManifest?.urgentMessage)) {
                     refreshTickerContent(afterManifest)
+                } else {
+                    recoverIfStuckBuffering()
                 }
+            }
+        }
+    }
+
+    private suspend fun applyManifestSafe(manifest: LocalManifestSnapshot?) {
+        manifestApplyMutex.withLock {
+            applyManifest(manifest)
+        }
+    }
+
+    private fun recoverIfStuckBuffering() {
+        val since = bufferingSinceMs ?: return
+        if (SystemClock.elapsedRealtime() - since < BUFFERING_STALL_MS) {
+            return
+        }
+        bufferingSinceMs = null
+        when (snapshot?.source) {
+            "live" -> scope.launch {
+                repository.syncContent(force = true)
+                applyManifestSafe(repository.localManifest())
+            }
+            else -> if (playlistItems.isNotEmpty()) {
+                playNext()
             }
         }
     }
@@ -147,6 +189,7 @@ class SignagePlaybackController(
             return
         }
 
+        imageLoadJob?.cancel()
         cancelImageTimer()
         player.stop()
         player.clearMediaItems()
@@ -262,7 +305,7 @@ class SignagePlaybackController(
         syncJob = scope.launch {
             delay(15_000)
             repository.syncContent(force = true)
-            applyManifest(repository.localManifest())
+            applyManifestSafe(repository.localManifest())
         }
     }
 
@@ -325,15 +368,45 @@ class SignagePlaybackController(
         player.clearMediaItems()
         playerView.visibility = View.GONE
         imageView.visibility = View.VISIBLE
-
         imageView.setImageDrawable(null)
-        val bitmap = BitmapFactory.decodeFile(item.file.absolutePath)
-        imageView.setImageBitmap(bitmap)
 
-        val seconds = item.entry.duration.takeIf { it > 0 } ?: DEFAULT_IMAGE_SECONDS
-        val runnable = Runnable { playNext() }
-        imageAdvanceRunnable = runnable
-        mainHandler.postDelayed(runnable, seconds * 1000L)
+        val indexAtStart = currentIndex
+        imageLoadJob?.cancel()
+        imageLoadJob = scope.launch {
+            val bitmap = withContext(Dispatchers.IO) {
+                decodeSampledBitmap(item.file.absolutePath)
+            } ?: return@launch
+
+            if (indexAtStart != currentIndex || playlistItems.getOrNull(currentIndex)?.file != item.file) {
+                bitmap.recycle()
+                return@launch
+            }
+
+            imageView.setImageBitmap(bitmap)
+
+            val seconds = item.entry.duration.takeIf { it > 0 } ?: DEFAULT_IMAGE_SECONDS
+            val runnable = Runnable { playNext() }
+            cancelImageTimer()
+            imageAdvanceRunnable = runnable
+            mainHandler.postDelayed(runnable, seconds * 1000L)
+        }
+    }
+
+    private fun decodeSampledBitmap(path: String): android.graphics.Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null
+        }
+        val sample = maxOf(
+            1,
+            bounds.outWidth / MAX_IMAGE_WIDTH,
+            bounds.outHeight / MAX_IMAGE_HEIGHT,
+        )
+        return BitmapFactory.decodeFile(
+            path,
+            BitmapFactory.Options().apply { inSampleSize = sample },
+        )
     }
 
     private fun playNext() {
@@ -368,5 +441,8 @@ class SignagePlaybackController(
         private const val DEFAULT_IMAGE_SECONDS = 10
         private const val URGENT_POLL_SECONDS = 30
         private const val LAYOUT_TEXT_TICKER = "text_ticker"
+        private const val BUFFERING_STALL_MS = 90_000L
+        private const val MAX_IMAGE_WIDTH = 1920
+        private const val MAX_IMAGE_HEIGHT = 1080
     }
 }

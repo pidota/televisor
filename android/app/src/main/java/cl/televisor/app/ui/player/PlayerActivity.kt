@@ -35,7 +35,9 @@ class PlayerActivity : AppCompatActivity() {
         // Respaldo si el sistema pausa la actividad; la sync principal la hace SignagePlaybackController.
         app.deviceRepository.startBackgroundSync()
 
-        val player = ExoPlayer.Builder(this).build()
+        val player = ExoPlayer.Builder(this)
+            .setWakeMode(androidx.media3.common.C.WAKE_MODE_LOCAL)
+            .build()
         exoPlayer = player
         binding.playerView.player = player
 
