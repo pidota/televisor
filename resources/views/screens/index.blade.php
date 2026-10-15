@@ -6,7 +6,7 @@
 
 @section('content')
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
-        @can('manage-content')
+        @can('pair', \App\Models\Screen::class)
             <a href="{{ route('screens.pair.create') }}" class="btn btn-primary" style="background-color: #0d3b66; border-color: #0d3b66;">
                 <i class="bi bi-link-45deg me-1"></i> Vincular pantalla
             </a>
@@ -73,7 +73,7 @@
                         <tr>
                             <td colspan="6" class="text-center text-muted py-5">
                                 No hay pantallas registradas.
-                                @can('manage-content')
+                                @can('pair', \App\Models\Screen::class)
                                     <a href="{{ route('screens.pair.create') }}">Vincule la primera pantalla</a>.
                                 @endcan
                             </td>

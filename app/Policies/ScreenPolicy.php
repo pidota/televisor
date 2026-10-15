@@ -19,7 +19,7 @@ class ScreenPolicy
 
     public function pair(User $user): bool
     {
-        return $user->hasAnyRole(['admin', 'operator']);
+        return $user->hasRole('admin');
     }
 
     public function update(User $user, Screen $screen): bool

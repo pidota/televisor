@@ -12,6 +12,7 @@ use App\Http\Controllers\UrgentMessageController;
 use App\Http\Controllers\ModulePlaceholderController;
 use App\Http\Controllers\ScreenController;
 use App\Http\Controllers\ScreenPairingController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
@@ -37,11 +38,6 @@ Route::middleware('auth')->group(function () {
         Route::put('pantallas/grupos/{screenGroup}/pantallas', [ScreenGroupController::class, 'syncMembers'])->name('screen-groups.members.sync');
         Route::delete('pantallas/grupos/{screenGroup}', [ScreenGroupController::class, 'destroy'])->name('screen-groups.destroy');
 
-        Route::get('pantallas/vincular/nuevo', [ScreenPairingController::class, 'create'])->name('screens.pair.create');
-        Route::post('pantallas/vincular', [ScreenPairingController::class, 'verify'])->name('screens.pair.verify');
-        Route::get('pantallas/vincular/{pairing}/completar', [ScreenPairingController::class, 'completeForm'])->name('screens.pair.complete');
-        Route::post('pantallas/vincular/{pairing}/completar', [ScreenPairingController::class, 'complete'])->name('screens.pair.store');
-
         Route::get('pantallas/{screen}/editar', [ScreenController::class, 'edit'])->name('screens.edit');
         Route::put('pantallas/{screen}', [ScreenController::class, 'update'])->name('screens.update');
 
@@ -55,11 +51,20 @@ Route::middleware('auth')->group(function () {
     Route::get('pantallas/grupos/{screenGroup}', [ScreenGroupController::class, 'show'])->name('screen-groups.show');
 
     Route::middleware('role:admin')->group(function () {
+        Route::get('pantallas/vincular/nuevo', [ScreenPairingController::class, 'create'])->name('screens.pair.create');
+        Route::post('pantallas/vincular', [ScreenPairingController::class, 'verify'])->name('screens.pair.verify');
+        Route::get('pantallas/vincular/{pairing}/completar', [ScreenPairingController::class, 'completeForm'])->name('screens.pair.complete');
+        Route::post('pantallas/vincular/{pairing}/completar', [ScreenPairingController::class, 'complete'])->name('screens.pair.store');
+
         Route::post('pantallas/{screen}/revocar', [ScreenController::class, 'revoke'])->name('screens.revoke');
         Route::delete('pantallas/{screen}', [ScreenController::class, 'destroy'])->name('screens.destroy');
 
-        Route::get('usuarios', fn () => app(ModulePlaceholderController::class)->show('users'))
-            ->name('users.index');
+        Route::get('usuarios', [UserController::class, 'index'])->name('users.index');
+        Route::get('usuarios/nuevo', [UserController::class, 'create'])->name('users.create');
+        Route::post('usuarios', [UserController::class, 'store'])->name('users.store');
+        Route::get('usuarios/{user}/editar', [UserController::class, 'edit'])->name('users.edit');
+        Route::put('usuarios/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('usuarios/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
         Route::get('configuracion', fn () => app(ModulePlaceholderController::class)->show('settings'))
             ->name('settings.index');
