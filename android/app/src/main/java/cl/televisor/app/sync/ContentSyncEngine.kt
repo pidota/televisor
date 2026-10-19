@@ -149,6 +149,11 @@ class ContentSyncEngine(
                 ItemOutcome.SKIPPED -> skipped++
                 ItemOutcome.FAILED -> failed++
             }
+
+            if (localItems.isNotEmpty()) {
+                manifestStore.save(remote.toLocalSnapshot(localItems))
+                session.setLastSyncedManifestVersion(remote.version)
+            }
         }
 
         val snapshot = remote.toLocalSnapshot(localItems)

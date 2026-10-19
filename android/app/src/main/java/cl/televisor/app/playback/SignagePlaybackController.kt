@@ -47,6 +47,8 @@ class SignagePlaybackController(
     private var monitorJob: Job? = null
     private var heartbeatJob: Job? = null
     private var syncJob: Job? = null
+    private var contentSyncJob: Job? = null
+    private var syncProgressJob: Job? = null
     private var imageLoadJob: Job? = null
     private var bufferingSinceMs: Long? = null
     private val manifestApplyMutex = Mutex()
@@ -81,9 +83,10 @@ class SignagePlaybackController(
     fun start() {
         player.addListener(playerListener)
         scope.launch {
-            repository.syncContent(force = false)
             applyManifestSafe(repository.localManifest())
         }
+        startSyncProgressWatcher()
+        launchContentSync(force = false)
         startManifestMonitor()
         startHeartbeatLoop()
     }
@@ -92,6 +95,8 @@ class SignagePlaybackController(
         monitorJob?.cancel()
         heartbeatJob?.cancel()
         syncJob?.cancel()
+        contentSyncJob?.cancel()
+        syncProgressJob?.cancel()
         imageLoadJob?.cancel()
         cancelImageTimer()
         urgentView.hide(animate = false)
@@ -123,6 +128,43 @@ class SignagePlaybackController(
         }
     }
 
+    private fun launchContentSync(force: Boolean, onComplete: (() -> Unit)? = null) {
+        if (contentSyncJob?.isActive == true) {
+            return
+        }
+
+        contentSyncJob = scope.launch(Dispatchers.IO) {
+            repository.syncContent(force)
+            withContext(Dispatchers.Main.immediate) {
+                applyManifestSafe(repository.localManifest())
+                onComplete?.invoke()
+            }
+        }
+    }
+
+    private fun startSyncProgressWatcher() {
+        syncProgressJob?.cancel()
+        syncProgressJob = scope.launch {
+            while (isActive) {
+                delay(SYNC_PROGRESS_POLL_MS)
+                if (contentSyncJob?.isActive != true) {
+                    continue
+                }
+
+                val local = repository.localManifest() ?: continue
+                val readyCount = LocalPlaybackCatalog.orderedFiles(local, mediaStore).size
+                if (readyCount <= 0) {
+                    continue
+                }
+
+                val playingCount = playlistItems.size
+                if (playingCount == 0 || readyCount > playingCount) {
+                    applyManifestSafe(local)
+                }
+            }
+        }
+    }
+
     private fun startManifestMonitor() {
         monitorJob?.cancel()
         monitorJob = scope.launch {
@@ -136,19 +178,20 @@ class SignagePlaybackController(
                 val before = snapshot?.version to snapshot?.source
                 val urgentBefore = snapshot?.urgentMessage?.id
                 val liveBefore = snapshot?.liveUrl
-                repository.syncContent(force = false)
-                val afterManifest = repository.localManifest()
-                val after = afterManifest?.version to afterManifest?.source
-                val urgentAfter = afterManifest?.urgentMessage?.id
-                val liveAfter = afterManifest?.liveUrl
-                if (before != after || urgentBefore != urgentAfter || liveBefore != liveAfter) {
-                    applyManifestSafe(afterManifest)
-                } else if (isFullscreenUrgent(afterManifest)) {
-                    afterManifest?.let { refreshUrgentContent(it) }
-                } else if (isTickerMessage(afterManifest?.urgentMessage)) {
-                    refreshTickerContent(afterManifest)
-                } else {
-                    recoverIfStuckBuffering()
+                launchContentSync(force = false) {
+                    val afterManifest = repository.localManifest()
+                    val after = afterManifest?.version to afterManifest?.source
+                    val urgentAfter = afterManifest?.urgentMessage?.id
+                    val liveAfter = afterManifest?.liveUrl
+                    if (before != after || urgentBefore != urgentAfter || liveBefore != liveAfter) {
+                        scope.launch { applyManifestSafe(afterManifest) }
+                    } else if (isFullscreenUrgent(afterManifest)) {
+                        afterManifest?.let { refreshUrgentContent(it) }
+                    } else if (isTickerMessage(afterManifest?.urgentMessage)) {
+                        refreshTickerContent(afterManifest)
+                    } else {
+                        recoverIfStuckBuffering()
+                    }
                 }
             }
         }
@@ -304,8 +347,7 @@ class SignagePlaybackController(
         syncJob?.cancel()
         syncJob = scope.launch {
             delay(15_000)
-            repository.syncContent(force = true)
-            applyManifestSafe(repository.localManifest())
+            launchContentSync(force = true)
         }
     }
 
@@ -442,6 +484,7 @@ class SignagePlaybackController(
         private const val URGENT_POLL_SECONDS = 30
         private const val LAYOUT_TEXT_TICKER = "text_ticker"
         private const val BUFFERING_STALL_MS = 90_000L
+        private const val SYNC_PROGRESS_POLL_MS = 2_000L
         private const val MAX_IMAGE_WIDTH = 1920
         private const val MAX_IMAGE_HEIGHT = 1080
     }
